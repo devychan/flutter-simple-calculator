@@ -52,104 +52,147 @@ class AppState extends State<App> {
   }
 
   void _click(String text) {
-    final List<String> operators = [
-      Button.add,
-      Button.minus,
-      Button.multiply,
-      Button.divide,
-      Button.modulos,
-      Button.dot
-    ];
-    if (text == Button.clear) {
-      _clear();
-      return;
-    }
-    if (text == Button.delete) {
-      setState(() {
-        if (input.length == 1) {
+    try {
+      final List<String> operators = [
+        Button.add,
+        Button.minus,
+        Button.multiply,
+        Button.divide,
+        Button.modulos,
+        Button.dot
+      ];
+      if (text == Button.clear) {
+        _clear();
+        return;
+      }
+      if (text == Button.delete) {
+        setState(() {
+          if (input.length == 1) {
+            input = "0";
+            expression = "0";
+            result = 0;
+          } else {
+            final index = input.length - 1;
+            final suffix = index == -1 ? 0 : index;
+
+            final indexExpression = expression.length - 1;
+            final suffixExpression =
+                indexExpression == -1 ? 0 : indexExpression;
+            input = input.substring(0, suffix);
+            expression = expression.substring(0, suffixExpression);
+          }
+        });
+        return;
+      }
+      if (text == Button.result) {
+        setState(() {
+          input = "$result";
+          expression = "$result";
+        });
+        return;
+      }
+
+      int index = input.length - 1;
+      String last = input[index];
+
+      if (index == -1) {
+        setState(() {
           input = "0";
           expression = "0";
-          result = 0;
+        });
+        return;
+      }
+
+      // Check if input is operator
+      if (operators.contains(text)) {
+        /**
+         * Check if display text last character is operator also
+         * otherwise, set the new operator
+         * 1234+
+         *     ^
+         *     - is operator
+         */
+        dynamic isNum = int.tryParse(last);
+        if (!operators.contains(last)) {
+          setState(() {
+            if (isNum == false) {
+              input = text;
+            } else {
+              input += text;
+            }
+          });
         } else {
-          final index = input.length - 1;
-          final suffix = index == -1 ? 0 : index;
-
-          final indexExpression = expression.length - 1;
-          final suffixExpression = indexExpression == -1 ? 0 : indexExpression;
-          input = input.substring(0, suffix);
-          expression = expression.substring(0, suffixExpression);
+          final display = "${input.substring(0, index)}$text";
+          setState(() {
+            input = display;
+          });
         }
-      });
-      return;
-    }
-    if (text == Button.result) {
-      setState(() {
-        input = "$result";
-        expression = "$result";
-      });
-      return;
-    }
-
-    int index = input.length - 1;
-    String last = input[index];
-
-    if (index == -1) {
-      setState(() {
-        input = "0";
-        expression = "0";
-      });
-      return;
-    }
-
-    // Check if input is operator
-    if (operators.contains(text)) {
-      /**
-       * Check if display text last character is operator also
-       * otherwise, set the new operator
-       * 1234+
-       *     ^
-       *     - is operator
-       */
-      dynamic isNum = int.tryParse(last);
-      if (!operators.contains(last)) {
         setState(() {
-          if (text == Button.minus && isNum == false) {
+          expression = input
+              .replaceAll('*', Button.display[Button.multiply])
+              .replaceAll('/', Button.display[Button.divide]);
+        });
+      } else {
+        RegExp regex = RegExp(r'^([0-9])+(\/)+([0-9])+(\+|\-|\*|\/)+$');
+        final bool match = regex.hasMatch(input);
+        setState(() {
+          if (input == Button.zero) {
             input = text;
           } else {
             input += text;
           }
-        });
-      } else {
-        final display = "${input.substring(0, index)}$text";
-        setState(() {
-          input = display;
+          if (match) {
+            int lastIndex = input.length - 1;
+            if (lastIndex != -1) {
+              /**
+               * Assumed
+               * 0 / 5 is first expression
+               * - 2 is second expression
+               * 
+               * if expression 0 / 5 - 2
+               *  then 0 - 2
+               * else if expression 0 / 5 * 2
+               *  then 0 / 5 and then 0 * 2
+               * else if expression 0 / 5 / 2
+               *  then 0 / 5 and 0 / 2
+               * e.g.
+               * lastIndex = '2'
+               * beforeLastIndex = '-'
+               */
+              String operator = input[lastIndex - 1];
+              dynamic operand = input.substring(0, lastIndex - 1);
+
+              dynamic result1 = eval(operand);
+
+              if (result1 is num) {
+                if (result1 % 1 == 0) {
+                  int val1 = result1.toInt();
+                  input = "${eval("$val1 $operator $text")}";
+                } else {
+                  double val1 = result1.toDouble();
+                  input = "${eval("$val1 $operator $text")}";
+                }
+              }
+            } else {
+              input = "0";
+            }
+          }
+
+          dynamic resultExpression = eval(input);
+          if (resultExpression is num) {
+            result = resultExpression % 1 == 0
+                ? resultExpression.toInt()
+                : resultExpression;
+          } else {
+            result = "Syntax Error";
+          }
+          expression = input
+              .replaceAll('*', Button.display[Button.multiply])
+              .replaceAll('/', Button.display[Button.divide]);
         });
       }
-      setState(() {
-        expression = input
-            .replaceAll('*', Button.display[Button.multiply])
-            .replaceAll('/', Button.display[Button.divide]);
-      });
-      print('Symbol: $input');
-    } else {
-      setState(() {
-        if (input == Button.zero) {
-          input = text;
-        } else {
-          input += text;
-        }
-        final dynamic resultExpression = eval(input);
-        if (resultExpression is num) {
-          result = resultExpression % 1 == 0
-              ? resultExpression.toInt()
-              : resultExpression;
-        } else {
-          result = "Syntax Error";
-        }
-        expression = input
-            .replaceAll('*', Button.display[Button.multiply])
-            .replaceAll('/', Button.display[Button.divide]);
-      });
+    } catch (e) {
+      print(e);
     }
   }
 
